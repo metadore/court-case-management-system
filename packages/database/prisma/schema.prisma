@@ -1,0 +1,869 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  ADMIN
+  JUDGE
+  LAWYER
+  CLERK
+  PUBLIC
+}
+
+enum CaseType {
+  CIVIL
+  CRIMINAL
+  FAMILY
+  PROBATE
+  COMMERCIAL
+  CONSTITUTIONAL
+  APPELLATE
+  OTHER
+}
+
+enum CaseStatus {
+  FILED
+  PENDING
+  ACTIVE
+  ADJOURNED
+  DEFAULT
+  DISMISSED_FOR_WANT_OF_PROSECUTION
+  CLOSED
+  ARCHIVED
+}
+
+enum PartyRole {
+  PLAINTIFF
+  DEFENDANT
+  COUNSEL_PLAINTIFF
+  COUNSEL_DEFENDANT
+  INTERVENOR
+  WITNESS
+  AMICUS
+  OTHER
+}
+
+enum DocumentType {
+  COMPLAINT
+  MOTION
+  RESPONSE
+  ORDER
+  JUDGMENT
+  NOTICE
+  AFFIDAVIT
+  EVIDENCE
+  TRANSCRIPT
+  OTHER
+}
+
+enum HearingType {
+  ARRAIGNMENT
+  BAIL
+  PRELIMINARY
+  TRIAL
+  MOTION_HEARING
+  SENTENCING
+  APPEAL
+  STATUS_CONFERENCE
+  OTHER
+}
+
+enum HearingStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  ADJOURNED
+  CANCELLED
+  NO_SHOW
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum PaymentType {
+  FILING_FEE
+  FINE
+  SERVICE_FEE
+  BAIL_BOND
+  OTHER
+}
+
+enum NotificationEventType {
+  HEARING_SCHEDULED
+  HEARING_RESCHEDULED
+  HEARING_CANCELLED
+  HEARING_COMPLETED
+  HEARING_REMINDER
+  CASE_FILED
+  CASE_STATUS_CHANGED
+  DOCUMENT_FILED
+  PAYMENT_DUE
+  PAYMENT_RECEIVED
+  PARTY_ADDED
+  GENERAL_NOTICE
+}
+
+enum DeliveryChannel {
+  SMS
+  EMAIL
+}
+
+enum DeliveryStatus {
+  PENDING
+  SENDING
+  SENT
+  FAILED
+  CANCELLED
+}
+
+enum SubscriptionTier {
+  STAFF
+  PARTY
+  PUBLIC_BASIC
+  PUBLIC_PRO
+}
+
+enum RepresentationStatus {
+  UNREPRESENTED_PENDING
+  PRO_SE
+  COUNSEL_RETAINED
+  COUNSEL_APPOINTED
+}
+
+enum AppointmentType {
+  RETAINED
+  APPOINTED
+}
+
+enum HearingFormat {
+  IN_PERSON
+  VIRTUAL
+  HYBRID
+}
+
+enum CasePriority {
+  STANDARD
+  URGENT
+  EMERGENCY
+}
+
+enum DocumentConfidentiality {
+  PUBLIC
+  RESTRICTED
+  SEALED
+  CONFIDENTIAL
+}
+
+enum CaseCloseReason {
+  JUDGMENT
+  SETTLEMENT
+  DISMISSAL
+  DEFAULT_JUDGMENT
+  WITHDRAWN
+  TRANSFERRED
+  OTHER
+}
+
+enum MotionType {
+  MOTION_TO_DISMISS
+  MOTION_FOR_SUMMARY_JUDGMENT
+  MOTION_IN_LIMINE
+  MOTION_TO_COMPEL
+  MOTION_FOR_CONTINUANCE
+  MOTION_FOR_DEFAULT_JUDGMENT
+  MOTION_TO_SUPPRESS
+  MOTION_FOR_RECONSIDERATION
+  MOTION_FOR_SANCTIONS
+  OTHER
+}
+
+enum MotionStatus {
+  FILED
+  PENDING_RESPONSE
+  RESPONSE_FILED
+  UNDER_SUBMISSION
+  GRANTED
+  DENIED
+  WITHDRAWN
+  MOOT
+}
+
+enum DeadlineType {
+  RESPONSE
+  REPLY
+  DISCOVERY_CUTOFF
+  EXPERT_DISCLOSURE
+  PRETRIAL_CONFERENCE
+  TRIAL
+  APPEAL
+  SERVICE_OF_PROCESS
+  OTHER
+}
+
+enum EvidenceType {
+  PHYSICAL
+  DOCUMENTARY
+  DIGITAL
+  TESTIMONIAL
+  DEMONSTRATIVE
+  OTHER
+}
+
+enum EvidenceStatus {
+  INTAKE
+  IN_CUSTODY
+  TRANSFERRED
+  RELEASED
+  DESTROYED
+}
+
+enum FeeWaiverStatus {
+  PENDING
+  APPROVED
+  DENIED
+  WITHDRAWN
+}
+
+enum NoteVisibility {
+  PRIVATE
+  JUDGES_AND_CLERKS
+  ALL_STAFF
+}
+
+// ─── Models ────────────────────────────────────────────────────────────────────
+
+model Court {
+  id        String   @id @default(cuid())
+  name      String
+  code      String   @unique
+  address   String?
+  phone     String?
+  email     String?
+  website   String?
+  config    Json     @default("{}")
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users      User[]
+  cases      Case[]
+  courtrooms Courtroom[]
+
+  @@map("courts")
+}
+
+model User {
+  id              String    @id @default(cuid())
+  courtId         String?
+  email           String    @unique
+  passwordHash    String
+  role            UserRole
+  firstName       String
+  lastName        String
+  barNumber       String?
+  phone           String?
+  isActive        Boolean   @default(true)
+  emailVerifiedAt DateTime?
+  totpSecret      String?
+  totpEnabled     Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  court                   Court?                   @relation(fields: [courtId], references: [id])
+  assignedCases           Case[]                   @relation("JudgeCases")
+  createdCases            Case[]                   @relation("ClerkCases")
+  parties                 Party[]
+  uploadedDocs            Document[]
+  hearingsJudged          Hearing[]
+  notifications           Notification[]
+  payments                Payment[]
+  sessions                Session[]
+  signatures              DocumentSignature[]
+  notificationSubscriptions NotificationSubscription[]
+  lawyerProfile           LawyerProfile?
+  hearingRecordings       HearingRecording[]
+  caseNotes               CaseNote[]
+  filedMotions            Motion[]
+  completedDeadlines      Deadline[]         @relation("DeadlineCompleter")
+  completedChecklistItems CaseChecklistItem[]
+  custodiedEvidence       Evidence[]
+  evidenceTransfersFrom   EvidenceTransfer[] @relation("EvidenceTransferFrom")
+  evidenceTransfersTo     EvidenceTransfer[] @relation("EvidenceTransferTo")
+  feeWaiverApplications   FeeWaiverApplication[] @relation("FeeWaiverApplicant")
+  reviewedFeeWaivers      FeeWaiverApplication[] @relation("FeeWaiverReviewer")
+
+  @@index([courtId])
+  @@index([courtId, createdAt])
+  @@index([role])
+  @@index([role, isActive])
+  @@map("users")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique // SHA-256 hash of the JWT token (H2 fix)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tokenHash])
+  @@index([expiresAt]) // For cleanup queries (M3 fix)
+  @@map("sessions")
+}
+
+model Case {
+  id                 String       @id @default(cuid())
+  courtId            String
+  caseNumber         String       @unique
+  title              String
+  type               CaseType
+  status             CaseStatus   @default(FILED)
+  priority           CasePriority @default(STANDARD)
+  description        String?
+  filedAt            DateTime     @default(now())
+  closedAt           DateTime?
+  assignedJudgeId    String?
+  createdById        String
+  isPublic           Boolean          @default(true)
+  tags               String[]
+  consolidatedIntoId String?
+  parentCaseId       String?
+  closeReason        CaseCloseReason?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  court                     Court                    @relation(fields: [courtId], references: [id])
+  assignedJudge             User?                    @relation("JudgeCases", fields: [assignedJudgeId], references: [id])
+  createdBy                 User                     @relation("ClerkCases", fields: [createdById], references: [id])
+  consolidatedInto          Case?                    @relation("CaseConsolidation", fields: [consolidatedIntoId], references: [id])
+  consolidatedCases         Case[]                   @relation("CaseConsolidation")
+  parentCase                Case?                    @relation("CaseAppeals", fields: [parentCaseId], references: [id])
+  appealCases               Case[]                   @relation("CaseAppeals")
+  parties                   Party[]
+  documents                 Document[]
+  hearings                  Hearing[]
+  payments                  Payment[]
+  notifications             Notification[]
+  notificationSubscriptions NotificationSubscription[]
+  notes                     CaseNote[]
+  motions                   Motion[]
+  deadlines                 Deadline[]
+  checklistItems            CaseChecklistItem[]
+  evidence                  Evidence[]
+  feeWaiverApplications     FeeWaiverApplication[]
+
+  @@index([courtId, status])
+  @@index([courtId, priority])
+  @@index([caseNumber])
+  @@index([assignedJudgeId])
+  @@index([isPublic])
+  @@map("cases")
+}
+
+model Party {
+  id                   String                @id @default(cuid())
+  caseId               String
+  userId               String?
+  name                 String
+  role                 PartyRole
+  email                String?
+  phone                String?
+  address              String?
+  representationStatus RepresentationStatus?
+  appointmentType      AppointmentType?
+  servedAt             DateTime?
+  serviceMethod        String?
+  interpreterNeeded    Boolean               @default(false)
+  interpreterLanguage  String?
+  isProSe              Boolean               @default(false)
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+
+  case Case  @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([caseId])
+  @@index([userId])
+  @@index([userId, role])
+  @@index([servedAt])
+  @@map("parties")
+}
+
+model Document {
+  id              String                  @id @default(cuid())
+  caseId          String
+  uploadedById    String
+  title           String
+  type            DocumentType
+  filePath        String
+  fileSize        Int
+  mimeType        String
+  confidentiality DocumentConfidentiality @default(PUBLIC)
+  version         Int                     @default(1)
+  parentDocId     String?
+  signedAt        DateTime?
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+
+  case       Case       @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  uploadedBy User       @relation(fields: [uploadedById], references: [id])
+  parentDoc  Document?  @relation("DocumentVersions", fields: [parentDocId], references: [id])
+  versions   Document[] @relation("DocumentVersions")
+  signatures DocumentSignature[]
+
+  @@index([caseId])
+  @@index([uploadedById])
+  @@map("documents")
+}
+
+model Courtroom {
+  id       String  @id @default(cuid())
+  courtId  String
+  name     String
+  capacity Int?
+  isActive Boolean @default(true)
+
+  court    Court     @relation(fields: [courtId], references: [id])
+  hearings Hearing[]
+
+  @@map("courtrooms")
+}
+
+model Hearing {
+  id              String        @id @default(cuid())
+  caseId          String
+  judgeId         String?
+  courtroomId     String?
+  scheduledAt     DateTime
+  durationMins    Int           @default(60)
+  type            HearingType
+  status          HearingStatus @default(SCHEDULED)
+  format          HearingFormat @default(IN_PERSON)
+  notes           String?
+  meetingLink     String?
+  continuedFromId String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  case          Case       @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  judge         User?      @relation(fields: [judgeId], references: [id])
+  courtroom     Courtroom? @relation(fields: [courtroomId], references: [id])
+  continuedFrom Hearing?   @relation("HearingContinuances", fields: [continuedFromId], references: [id])
+  continuations Hearing[]  @relation("HearingContinuances")
+  recordings    HearingRecording[]
+
+  @@index([judgeId, scheduledAt])
+  @@index([caseId])
+  @@index([courtroomId])
+  @@index([continuedFromId])
+  @@map("hearings")
+}
+
+model HearingRecording {
+  id                    String    @id @default(cuid())
+  hearingId             String
+  uploadedById          String
+  filePath              String
+  fileSize              Int
+  mimeType              String    @default("audio/webm")
+  durationSecs          Int?
+  status                String    @default("UPLOADED")
+  transcript            String?
+  transcriptGeneratedAt DateTime?
+  transcriptProvider    String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  hearing    Hearing @relation(fields: [hearingId], references: [id], onDelete: Cascade)
+  uploadedBy User    @relation(fields: [uploadedById], references: [id])
+
+  @@index([hearingId])
+  @@index([status])
+  @@map("hearing_recordings")
+}
+
+model Notification {
+  id         String   @id @default(cuid())
+  userId     String
+  caseId     String?
+  type       String
+  title      String
+  body       String
+  isRead     Boolean  @default(false)
+  entityType String?
+  entityId   String?
+  createdAt  DateTime @default(now())
+
+  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  case Case? @relation(fields: [caseId], references: [id])
+
+  @@index([userId, isRead])
+  @@index([userId, createdAt])
+  @@index([caseId])
+  @@map("notifications")
+}
+
+model Payment {
+  id                    String        @id @default(cuid())
+  caseId                String?
+  payerUserId           String?
+  amount                Int
+  currency              String        @default("USD")
+  stripePaymentIntentId String?       @unique
+  status                PaymentStatus @default(PENDING)
+  type                  PaymentType
+  description           String?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  case      Case? @relation(fields: [caseId], references: [id])
+  payerUser User? @relation(fields: [payerUserId], references: [id])
+
+  @@index([caseId])
+  @@index([payerUserId])
+  @@map("payments")
+}
+
+model DocumentSignature {
+  id            String   @id @default(cuid())
+  documentId    String
+  userId        String
+  signedAt      DateTime @default(now())
+  signatureHash String   @unique
+  signerName    String
+  signerRole    String
+  signerEmail   String?
+  ipAddress     String?
+  userAgent     String?
+  certificate   Json?    @default("{}")
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id])
+
+  @@index([documentId])
+  @@index([userId])
+  @@map("document_signatures")
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now())
+
+  // actor
+  actorUserId String
+  actorRole   String
+
+  // multi-tenant partitioning (denormalized)
+  courtId     String?
+
+  // entity affected
+  entityType  String
+  entityId    String
+  action      String
+
+  // state transition info (optional for non-state events)
+  fromState   String?
+  toState     String?
+
+  // field-level change details
+  changes     Json?
+
+  // optional correlation identifier
+  requestId   String?
+
+  @@index([courtId, createdAt])
+  @@index([entityType, entityId])
+  @@map("audit_logs")
+}
+
+// ─── Notification delivery ────────────────────────────────────────────────────
+
+model LawyerProfile {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  bio                String?
+  photoUrl           String?
+  practiceAreas      String[]
+  yearsOfExperience  Int?
+  officeAddress      String?
+  website            String?
+  availabilityStatus String   @default("AVAILABLE")
+  customHours        Json?    @default("{}")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  user     User           @relation(fields: [userId], references: [id])
+  ratings  LawyerRating[]
+
+  @@map("lawyer_profiles")
+}
+
+model LawyerRating {
+  id        String   @id @default(cuid())
+  lawyerId  String
+  userId    String?
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+
+  lawyer LawyerProfile @relation(fields: [lawyerId], references: [id], onDelete: Cascade)
+
+  @@unique([lawyerId, userId])
+  @@index([lawyerId])
+  @@map("lawyer_ratings")
+}
+
+model NotificationSubscription {
+  id                   String                @id @default(cuid())
+  caseId               String
+  userId               String?
+  email                String?
+  phone                String?
+  subscribeAll         Boolean               @default(false)
+  eventTypes           NotificationEventType[]
+  channels             DeliveryChannel[]
+  stripeSubscriptionId String?
+  tier                 SubscriptionTier      @default(PARTY)
+  activeUntil          DateTime?
+  isActive             Boolean               @default(true)
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+
+  case  Case  @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  user  User? @relation(fields: [userId], references: [id])
+
+  @@unique([userId, caseId])
+  @@index([caseId])
+  @@map("notification_subscriptions")
+}
+
+model OutboundNotification {
+  id             String                @id @default(cuid())
+  subscriptionId String?
+  caseId         String?
+  channel        DeliveryChannel
+  eventType      NotificationEventType
+  recipient      String
+  subject        String?
+  body           String
+  status         DeliveryStatus        @default(PENDING)
+  attempts       Int                   @default(0)
+  maxAttempts    Int                   @default(3)
+  nextRetryAt    DateTime?
+  providerId     String?
+  providerRef    String?
+  providerError  String?
+  scheduledAt    DateTime              @default(now())
+  sentAt         DateTime?
+  createdAt      DateTime              @default(now())
+
+  @@index([status, scheduledAt])
+  @@index([caseId])
+  @@map("outbound_notifications")
+}
+
+model NotificationProvider {
+  id        String          @id @default(cuid())
+  name      String
+  type      String
+  channel   DeliveryChannel
+  isDefault Boolean         @default(false)
+  isActive  Boolean         @default(true)
+  config    Json
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  @@map("notification_providers")
+}
+
+model SubscriptionPlan {
+  id            String           @id @default(cuid())
+  name          String
+  tier          SubscriptionTier
+  stripePriceId String           @unique
+  pricePerMonth Int
+  maxCases      Int?
+  channels      DeliveryChannel[]
+  description   String?
+  isActive      Boolean          @default(true)
+  createdAt     DateTime         @default(now())
+
+  @@map("subscription_plans")
+}
+
+// ─── Case Notes ───────────────────────────────────────────────────────────────
+
+model CaseNote {
+  id         String         @id @default(cuid())
+  caseId     String
+  authorId   String
+  content    String
+  visibility NoteVisibility @default(ALL_STAFF)
+  isPinned   Boolean        @default(false)
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  case   Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  author User @relation(fields: [authorId], references: [id])
+
+  @@index([caseId])
+  @@map("case_notes")
+}
+
+// ─── Motions & Deadlines ──────────────────────────────────────────────────────
+
+model Motion {
+  id             String       @id @default(cuid())
+  caseId         String
+  filedById      String
+  documentId     String?
+  type           MotionType
+  title          String
+  status         MotionStatus @default(FILED)
+  filedAt        DateTime     @default(now())
+  respondByDate  DateTime?
+  replyByDate    DateTime?
+  decidedAt      DateTime?
+  notes          String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  case      Case       @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  filedBy   User       @relation(fields: [filedById], references: [id])
+  deadlines Deadline[]
+
+  @@index([caseId])
+  @@map("motions")
+}
+
+model Deadline {
+  id              String       @id @default(cuid())
+  caseId          String
+  motionId        String?
+  type            DeadlineType
+  title           String
+  dueDate         DateTime
+  completedAt     DateTime?
+  completedById   String?
+  isAutoGenerated Boolean      @default(false)
+  notes           String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  case        Case    @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  motion      Motion? @relation(fields: [motionId], references: [id])
+  completedBy User?   @relation("DeadlineCompleter", fields: [completedById], references: [id])
+
+  @@index([caseId])
+  @@index([dueDate])
+  @@index([completedAt])
+  @@map("deadlines")
+}
+
+// ─── Case Lifecycle Checklist ─────────────────────────────────────────────────
+
+model CaseChecklistItem {
+  id            String    @id @default(cuid())
+  caseId        String
+  step          String
+  description   String?
+  order         Int
+  isCompleted   Boolean   @default(false)
+  completedAt   DateTime?
+  completedById String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  case        Case  @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  completedBy User? @relation(fields: [completedById], references: [id])
+
+  @@index([caseId])
+  @@map("case_checklist_items")
+}
+
+// ─── Evidence Chain of Custody ────────────────────────────────────────────────
+
+model Evidence {
+  id              String         @id @default(cuid())
+  caseId          String
+  title           String
+  description     String?
+  type            EvidenceType
+  status          EvidenceStatus @default(INTAKE)
+  filePath        String?
+  fileSize        Int?
+  mimeType        String?
+  custodianId     String?
+  intakeDate      DateTime       @default(now())
+  storageLocation String?
+  condition       String?
+  exhibitNumber   String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  case      Case               @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  custodian User?              @relation(fields: [custodianId], references: [id])
+  transfers EvidenceTransfer[]
+
+  @@index([caseId])
+  @@map("evidence")
+}
+
+model EvidenceTransfer {
+  id               String   @id @default(cuid())
+  evidenceId       String
+  fromCustodianId  String?
+  toCustodianId    String?
+  transferredAt    DateTime @default(now())
+  reason           String?
+  notes            String?
+
+  evidence      Evidence @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+  fromCustodian User?    @relation("EvidenceTransferFrom", fields: [fromCustodianId], references: [id])
+  toCustodian   User?    @relation("EvidenceTransferTo", fields: [toCustodianId], references: [id])
+
+  @@index([evidenceId])
+  @@map("evidence_transfers")
+}
+
+// ─── Fee Waiver ───────────────────────────────────────────────────────────────
+
+model FeeWaiverApplication {
+  id                String          @id @default(cuid())
+  caseId            String
+  applicantId       String
+  incomeAmount      Int
+  householdSize     Int
+  numberOfDependents Int            @default(0)
+  employmentStatus  String?
+  assets            String?
+  status            FeeWaiverStatus @default(PENDING)
+  reviewedById      String?
+  reviewedAt        DateTime?
+  reviewNotes       String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  case       Case  @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  applicant  User  @relation("FeeWaiverApplicant", fields: [applicantId], references: [id])
+  reviewedBy User? @relation("FeeWaiverReviewer", fields: [reviewedById], references: [id])
+
+  @@index([caseId])
+  @@index([status])
+  @@index([applicantId])
+  @@index([reviewedById])
+  @@map("fee_waiver_applications")
+}

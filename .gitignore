@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+dist/
+.next/
+out/
+build/
+*.tsbuildinfo
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/settings.json
+.idea/
+
+# Turborepo
+.turbo/
+
+# Prisma
+packages/database/src/generated/
+
+# Uploads (local dev)
+uploads/
+
+# Electron
+apps/desktop/release/
+apps/desktop/out/
+
+# Test coverage
+coverage/

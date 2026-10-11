@@ -1,0 +1,40 @@
+{
+  "name": "@tpt-court/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "main": "electron/main.js",
+  "type": "commonjs",
+  "scripts": {
+    "dev": "electron .",
+    "build": "electron-builder",
+    "dist": "electron-builder --win --mac",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@tpt-court/api": "workspace:*"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0",
+    "typescript": "^5.7.0",
+    "@types/node": "^22.0.0"
+  },
+  "build": {
+    "appId": "com.tpt-court.desktop",
+    "productName": "TPT Court",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "electron/**/*",
+      "!node_modules/**/*"
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "mac": {
+      "target": "dmg"
+    }
+  }
+}

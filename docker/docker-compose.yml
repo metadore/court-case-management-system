@@ -1,0 +1,123 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: tpt_court
+      POSTGRES_PASSWORD: "${DB_PASSWORD:-change_me_in_production_db_password}"
+      POSTGRES_DB: tpt_court
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tpt_court"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:-change_me_in_production}"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-change_me_in_production}", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: "${MINIO_ROOT_USER:-minioadmin}"
+      MINIO_ROOT_PASSWORD: "${MINIO_ROOT_PASSWORD:-change_me_in_production}"
+    command: server /data --console-address ":9001"
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # ── Create MinIO bucket on startup ───────────────────────────────────────
+  minio-bucket-setup:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      sleep 3 &&
+      mc alias set minio http://minio:9000 ${MINIO_ROOT_USER:-minioadmin} ${MINIO_ROOT_PASSWORD:-change_me_in_production} &&
+      mc mb minio/tpt-court-documents --ignore-existing &&
+      # H6 fix: Remove public access; use application-level auth instead
+      mc anonymous set private minio/tpt-court-documents &&
+      echo 'MinIO bucket created: tpt-court-documents (private)'
+      "
+
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    volumes:
+      - uploads:/app/uploads
+
+  web:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.web
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    depends_on:
+      - api
+
+  # ── Automated Off-Site Backups ───────────────────────────────────────────
+  # Set BACKUP_ENABLED=true and BACKUP_S3_* in .env to enable.
+  # Runs a cron job inside the container per BACKUP_SCHEDULE.
+  backup:
+    build:
+      context: backup
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGDATABASE: tpt_court
+      PGUSER: tpt_court
+      PGPASSWORD: "${DB_PASSWORD:-change_me_in_production_db_password}"
+    volumes:
+      - pgdata:/var/lib/postgresql/data:ro
+      - backupdata:/backup
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  miniodata:
+  uploads:
+  backupdata:

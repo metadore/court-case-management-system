@@ -1,0 +1,47 @@
+FROM node:20-alpine AS base
+
+# Install pnpm
+RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
+
+WORKDIR /app
+
+# Copy monorepo config files
+COPY pnpm-lock.yaml package.json pnpm-workspace.yaml turbo.json tsconfig.base.json ./
+
+# Copy packages
+COPY packages/database ./packages/database
+COPY packages/types ./packages/types
+COPY packages/ui ./packages/ui
+
+# Copy api app
+COPY apps/api ./apps/api
+
+# Install dependencies
+RUN pnpm install --frozen-lockfile
+
+# Generate Prisma client
+RUN pnpm --filter @tpt-court/database run db:generate
+
+# Build
+RUN pnpm --filter @tpt-court/types build && \
+    pnpm --filter @tpt-court/database build && \
+    pnpm --filter @tpt-court/api build
+
+FROM node:20-alpine AS runner
+WORKDIR /app
+
+RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
+
+COPY --from=base /app/node_modules ./node_modules
+COPY --from=base /app/packages/database/dist ./packages/database/dist
+COPY --from=base /app/packages/database/prisma ./packages/database/prisma
+COPY --from=base /app/packages/types/dist ./packages/types/dist
+COPY --from=base /app/apps/api/dist ./apps/api/dist
+COPY --from=base /app/apps/api/package.json ./apps/api/package.json
+COPY --from=base /app/apps/api/node_modules ./apps/api/node_modules
+
+WORKDIR /app/apps/api
+
+EXPOSE 3001
+
+CMD ["node", "dist/index.js"]
