@@ -2,6 +2,13 @@
 
 Open-source court ERP platform for judges, lawyers, clerks, and the public. Manage cases, documents, hearings, and payments with ease.
 
+## Live Demo
+
+- **Web application:** [court-case-web-juwk.onrender.com](https://court-case-web-juwk.onrender.com)
+- **API health:** [court-case-api-t9r9.onrender.com/health](https://court-case-api-t9r9.onrender.com/health)
+
+The demo is hosted on Render's free plan. Services may take up to a minute to wake after inactivity. This deployment is for demonstration only; do not enter real court or personal data.
+
 ## Architecture
 
 ```
