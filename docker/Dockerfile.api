@@ -22,10 +22,10 @@ RUN pnpm install --frozen-lockfile
 # Generate Prisma client
 RUN pnpm --filter @tpt-court/database run db:generate
 
-# Build
-RUN pnpm --filter @tpt-court/types build && \
-    pnpm --filter @tpt-court/database build && \
-    pnpm --filter @tpt-court/api build
+# Build shared packages and API
+RUN pnpm --filter @tpt-court/types exec tsc -p tsconfig.json && \
+    pnpm --filter @tpt-court/database exec tsc -p tsconfig.json && \
+    pnpm --filter @tpt-court/api run build
 
 FROM node:20-alpine AS runner
 WORKDIR /app
