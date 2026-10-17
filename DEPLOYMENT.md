@@ -71,6 +71,8 @@ This document covers production deployment for all three targets:
 | `NEXT_PUBLIC_SOCKET_URL`              | Socket.io server URL         | **Yes**  | `http://localhost:3001`    |
 | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`  | Stripe publishable key       | Optional | —                          |
 
+For Docker deployments, declare any `NEXT_PUBLIC_*` variables used by the web app as build arguments before running `next build`; Next.js embeds their values in the client bundle at build time.
+
 ### Docker / Backup (`docker/.env`)
 
 | Variable                    | Description                              | Required | Default               |
