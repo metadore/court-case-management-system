@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { api } from "./api";
+import { ApiError, api } from "./api";
 import type { AuthUser } from "@tpt-court/types";
 
 interface AuthContextValue {
@@ -71,11 +71,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     api
       .get<{ data: AuthUser }>("/auth/me")
       .then((res) => setUser(res.data))
-      .catch(() => {
-        localStorage.removeItem("token");
-        setToken(null);
-        setUser(null);
-        router.push("/login");
+      .catch((error: unknown) => {
+        if (error instanceof ApiError && error.status === 401) {
+          clearToken();
+          setToken(null);
+          setUser(null);
+          router.push("/login");
+        }
       });
   }, [router]);
 

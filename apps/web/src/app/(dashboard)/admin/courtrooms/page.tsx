@@ -67,7 +67,7 @@ export default function CourtroomsPage() {
         await api.post("/admin/courtrooms", {
           name: form.name.trim(),
           capacity: form.capacity ? Number(form.capacity) : undefined,
-        });
+        }, 90_000);
       } else if (modal.courtroom) {
         await api.patch(`/admin/courtrooms/${modal.courtroom.id}`, {
           name: form.name.trim(),

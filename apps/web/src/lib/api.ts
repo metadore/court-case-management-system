@@ -6,6 +6,21 @@ interface RequestOptions {
   body?: unknown;
   formData?: FormData;
   signal?: AbortSignal;
+  timeoutMs?: number;
+}
+
+export class ApiError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
+export class RequestTimeoutError extends Error {
+  constructor() {
+    super("The request timed out. It may still have completed; check the list before trying again.");
+    this.name = "RequestTimeoutError";
+  }
 }
 
 async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
@@ -20,23 +35,30 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  // 30-second timeout; can be overridden by passing an explicit signal
-  const timeoutSignal = AbortSignal.timeout(30_000);
+  const timeoutSignal = AbortSignal.timeout(opts.timeoutMs ?? 30_000);
   const signal = opts.signal
     ? AbortSignal.any([opts.signal, timeoutSignal])
     : timeoutSignal;
 
-  const res = await fetch(`${API_BASE}${path}`, {
-    method: opts.method ?? "GET",
-    headers,
-    body: opts.formData ?? (opts.body ? JSON.stringify(opts.body) : undefined),
-    credentials: "include",
-    signal,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      method: opts.method ?? "GET",
+      headers,
+      body: opts.formData ?? (opts.body ? JSON.stringify(opts.body) : undefined),
+      credentials: "include",
+      signal,
+    });
+  } catch (error) {
+    if (signal.aborted && signal.reason instanceof DOMException && signal.reason.name === "TimeoutError") {
+      throw new RequestTimeoutError();
+    }
+    throw error;
+  }
 
   if (!res.ok) {
     const error = await res.json().catch(() => ({ message: "Request failed" }));
-    throw new Error(error.message ?? "Request failed");
+    throw new ApiError(error.message ?? "Request failed", res.status);
   }
 
   return res.json();
@@ -44,7 +66,8 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
 
 export const api = {
   get: <T>(path: string, signal?: AbortSignal) => request<T>(path, { signal }),
-  post: <T>(path: string, body?: unknown) => request<T>(path, { method: "POST", body }),
+  post: <T>(path: string, body?: unknown, timeoutMs?: number) =>
+    request<T>(path, { method: "POST", body, timeoutMs }),
   put: <T>(path: string, body?: unknown) => request<T>(path, { method: "PUT", body }),
   patch: <T>(path: string, body?: unknown) => request<T>(path, { method: "PATCH", body }),
   delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),

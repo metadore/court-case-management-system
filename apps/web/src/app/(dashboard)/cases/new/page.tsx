@@ -31,7 +31,7 @@ export default function NewCasePage() {
           .map((t) => t.trim())
           .filter(Boolean),
       };
-      const res = await api.post<{ data: { id: string } }>("/cases", body);
+      const res = await api.post<{ data: { id: string } }>("/cases", body, 90_000);
       router.push(`/cases/${res.data.id}`);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to create case");

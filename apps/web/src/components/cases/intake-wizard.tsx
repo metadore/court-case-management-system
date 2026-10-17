@@ -585,7 +585,7 @@ export function IntakeWizard({ onClose }: { onClose: () => void }) {
       if (tags.length) payload["tags"] = tags;
       if (judge.judgeId) payload["judgeId"] = judge.judgeId;
 
-      const created = await api.post<{ id: string; caseNumber: string }>("/cases", payload);
+      const created = await api.post<{ id: string; caseNumber: string }>("/cases", payload, 90_000);
 
       // Add parties
       for (const p of parties) {
